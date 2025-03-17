@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Windmill with Three.js</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        Use mouse to rotate camera.<br>
+        Press 'S' to toggle blade speed (slow/fast/stop).
+    </div>
+
+    <!-- Load Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <!-- Load OrbitControls from CDN -->
+    <script src="https://unpkg.com/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Enable shadows
+        document.body.appendChild(renderer.domElement);
+
+        // Camera position
+        camera.position.set(0, 5, 10);
+        camera.lookAt(0, 0, 0);
+
+        // Add OrbitControls for interactivity
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 5;
+        controls.maxDistance = 20;
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(50, 50);
+        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Green ground
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Windmill base (cylinder)
+        const baseGeometry = new THREE.CylinderGeometry(0.5, 1, 4, 32);
+        const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown color
+        const base = new THREE.Mesh(baseGeometry, baseMaterial);
+        base.position.y = 2;
+        base.castShadow = true;
+        base.receiveShadow = true;
+        scene.add(base);
+
+        // Windmill blades (group them to rotate together)
+        const bladesGroup = new THREE.Group();
+        const bladeGeometry = new THREE.BoxGeometry(0.1, 4, 0.05);
+        const bladeMaterial = new THREE.MeshStandardMaterial({ color: 0xD3D3D3 }); // Light gray blades
+
+        // Create 4 blades
+        for (let i = 0; i < 4; i++) {
+            const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+            blade.position.y = 2; // Offset from center
+            blade.rotation.z = (Math.PI / 2) * i; // Rotate each blade 90 degrees apart
+            blade.castShadow = true;
+            blade.receiveShadow = true;
+            bladesGroup.add(blade);
+        }
+        bladesGroup.position.y = 4; // Position at top of base
+        scene.add(bladesGroup);
+
+        // Windmill roof (cone)
+        const roofGeometry = new THREE.ConeGeometry(0.7, 1, 32);
+        const roofMaterial = new THREE.MeshStandardMaterial({ color: 0xFF4500 }); // Red roof
+        const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+        roof.position.y = 4.5;
+        roof.castShadow = true;
+        roof.receiveShadow = true;
+        scene.add(roof);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 10, 5);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // Blade rotation speed control
+        let bladeSpeed = 0.02; // Default speed
+        let speedState = 1; // 0 = stop, 1 = slow, 2 = fast
+
+        // Toggle blade speed with 'S' key
+        window.addEventListener('keydown', (event) => {
+            if (event.key.toLowerCase() === 's') {
+                speedState = (speedState + 1) % 3; // Cycle through states
+                if (speedState === 0) bladeSpeed = 0; // Stop
+                else if (speedState === 1) bladeSpeed = 0.02; // Slow
+                else bladeSpeed = 0.05; // Fast
+            }
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate blades
+            bladesGroup.rotation.y += bladeSpeed;
+
+            // Update controls
+            controls.update();
+
+            // Render scene
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
