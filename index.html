@@ -119,8 +119,8 @@
         </div>
         <div class="slider-container">
             <label for="modelScale">Model Scale:</label>
-            <input type="range" id="modelScale" min="0.1" max="5" value="1" step="0.1">
-            <span id="modelScaleValue">1x</span>
+            <input type="range" id="modelScale" min="1" max="50" value="10" step="1">
+            <span id="modelScaleValue">10x</span>
         </div>
     </div>
 
@@ -270,20 +270,20 @@
     let bladeDiameter = bladeLength * 2;
     let windmillModel = null;
     let rotorPart = null;
-    let modelScale = 1;
+    let modelScale = 10; // Start with a larger scale
 
     // Update blade diameter stat
     document.getElementById('bladeDiameterStat').textContent = bladeDiameter + ' m';
     
     // GLTF Loader to load the 3D model
     const loader = new THREE.GLTFLoader();
-    const modelUrl = 'Wind turbine.glb'; // Replace with your model URL
+    const modelUrl = 'your_model_url.glb'; // Replace with your model URL
 
     // Function to load the 3D model
     function loadModel() {
         loader.load(
             // The model URL - replace this with your actual model URL
-            'Wind turbine.glb',
+            'https://example.com/path/to/windmill.glb',
             
             // onLoad callback - called when the model is loaded
             function(gltf) {
@@ -295,6 +295,9 @@
                 // Set the scale of the model
                 windmillModel.scale.set(modelScale, modelScale, modelScale);
                 
+                // Position the model - may need adjustment based on your model
+                windmillModel.position.set(0, 0, 0);
+                
                 // Cast shadows
                 windmillModel.traverse(function(node) {
                     if (node.isMesh) {
@@ -303,15 +306,33 @@
                     }
                 });
                 
-                // Find the rotor part by name (you'll need to know the name from your model)
-                // This is a placeholder, your model's structure might be different
-                rotorPart = windmillModel.getObjectByName('WindmillRotor');
+                // Print the full model hierarchy to the console
+                console.log("Full model hierarchy:");
+                inspectModelHierarchy(windmillModel);
                 
-                // If rotorPart is found, we can animate it
-                if (!rotorPart) {
-                    console.warn('Rotor part not found in the model. You may need to identify its name in the model.');
-                    // You might need to find the exact path to the rotor in your model
-                    // For example, it might be nested deeper in the hierarchy
+                // Look for parts that might be rotors based on common naming
+                const possibleRotors = [];
+                windmillModel.traverse(function(node) {
+                    const name = node.name.toLowerCase();
+                    if (
+                        name.includes('rotor') || 
+                        name.includes('blade') || 
+                        name.includes('propeller') || 
+                        name.includes('wind') || 
+                        name.includes('turbine') ||
+                        name.includes('spin')
+                    ) {
+                        possibleRotors.push(node);
+                        console.log("Potential rotor part found:", node.name, node);
+                    }
+                });
+                
+                // If we found potential rotors, use the first one
+                if (possibleRotors.length > 0) {
+                    rotorPart = possibleRotors[0];
+                    console.log("Using this part as rotor:", rotorPart.name);
+                } else {
+                    console.warn('No rotor parts found automatically. Check console for model hierarchy and update the code manually.');
                 }
                 
                 // Hide loading text
@@ -452,6 +473,36 @@
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
+    
+    // Helper function to inspect model hierarchy and print to console
+    function inspectModelHierarchy(object, level = 0) {
+        const indent = ' '.repeat(level * 2);
+        let typeInfo = object.type;
+        
+        // Add more specific information based on object type
+        if (object.isMesh) typeInfo += ' (Mesh)';
+        if (object.isGroup) typeInfo += ' (Group)';
+        if (object.isObject3D && !object.isMesh && !object.isGroup) typeInfo += ' (Object3D)';
+        
+        console.log(`${indent}${object.name || 'unnamed'} [${typeInfo}]`);
+        
+        // Print additional useful properties
+        if (object.isMesh) {
+            console.log(`${indent}  - Geometry: ${object.geometry.type}`);
+            console.log(`${indent}  - Material: ${object.material.type}`);
+        }
+        
+        // Print position, rotation, scale for all objects
+        console.log(`${indent}  - Position: x=${object.position.x.toFixed(2)}, y=${object.position.y.toFixed(2)}, z=${object.position.z.toFixed(2)}`);
+        console.log(`${indent}  - Rotation: x=${object.rotation.x.toFixed(2)}, y=${object.rotation.y.toFixed(2)}, z=${object.rotation.z.toFixed(2)}`);
+        console.log(`${indent}  - Scale: x=${object.scale.x.toFixed(2)}, y=${object.scale.y.toFixed(2)}, z=${object.scale.z.toFixed(2)}`);
+        
+        // Recursively process children
+        if (object.children && object.children.length > 0) {
+            console.log(`${indent}  Children (${object.children.length}):`);
+            object.children.forEach(child => inspectModelHierarchy(child, level + 1));
+        }
+    }
     
     // Load the model
     loadModel();
