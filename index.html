@@ -91,7 +91,7 @@
     <div id="controls">
         <div class="slider-container">
             <label for="windSpeed">Wind Speed:</label>
-            <input type="range" id="windSpeed" min="0" max="30" value="10" step="1">
+            <input type="range" id="windSpeed" min="0" max="60" value="10" step="1">
             <span id="windSpeedValue">10 mph</span>
         </div>
         <div class="slider-container">
@@ -103,6 +103,11 @@
             <label for="bladesCount">Blades Count:</label>
             <input type="range" id="bladesCount" min="2" max="5" value="3" step="1">
             <span id="bladesCountValue">3</span>
+        </div>
+        <div class="slider-container">
+            <label for="bladeLength">Blade Length:</label>
+            <input type="range" id="bladeLength" min="10" max="40" value="25" step="1">
+            <span id="bladeLengthValue">25 m</span>
         </div>
     </div>
 
@@ -297,8 +302,8 @@
     let rotationSpeed = 0;
     let blades = [];
     let bladesCount = 3;
-    const bladeLength = 25; // meters
-    const bladeDiameter = bladeLength * 2;
+    let bladeLength = 25; // Now a variable instead of const
+    let bladeDiameter = bladeLength * 2;
 
     // Update blade diameter stat
     document.getElementById('bladeDiameterStat').textContent = bladeDiameter + ' m';
@@ -338,6 +343,7 @@
     function calculatePowerOutput() {
         const windSpeedMS = windSpeed * 0.44704; // Convert mph to m/s
         const airDensity = 1.225; // kg/m^3
+        bladeDiameter = bladeLength * 2; // Update diameter based on current blade length
         const sweptArea = Math.PI * Math.pow(bladeDiameter / 2, 2); // Swept area in m^2
         const ratedWindSpeedMS = 12; // Rated wind speed in m/s
         const cutInWindSpeedMS = 3; // Cut-in wind speed in m/s
@@ -373,18 +379,19 @@
 
         // Update stats display
         document.getElementById('windSpeedStat').textContent = windSpeed + ' mph (' + windSpeedMS.toFixed(1) + ' m/s)';
+        document.getElementById('bladeDiameterStat').textContent = bladeDiameter + ' m';
         document.getElementById('powerOutputStat').textContent = powerOutput.toFixed(1) + ' kW';
         document.getElementById('dailyEnergyStat').textContent = dailyEnergy.toFixed(1) + ' kWh';
         document.getElementById('efficiencyStat').textContent = (totalEfficiency * 100).toFixed(1) + '%';
         document.getElementById('homesStat').textContent = homesPowered;
 
         // Calculate rotation speed (in rad/s) to maintain tip speed ratio
-        const tipSpeedRatio = 6; // Reduced from 7 to 6 for slower visual rotation
-        const bladeRadius = bladeDiameter / 2; // 25 m
+        const tipSpeedRatio = 6;
+        const bladeRadius = bladeDiameter / 2;
         if (windSpeedMS < cutInWindSpeedMS || windSpeedMS >= cutOutWindSpeedMS) {
             rotationSpeed = 0;
         } else {
-            rotationSpeed = (tipSpeedRatio * windSpeedMS) / bladeRadius; // rad/s
+            rotationSpeed = (tipSpeedRatio * windSpeedMS) / bladeRadius;
         }
     }
     
@@ -418,6 +425,8 @@
     const cameraHeightValue = document.getElementById('cameraHeightValue');
     const bladesCountSlider = document.getElementById('bladesCount');
     const bladesCountValue = document.getElementById('bladesCountValue');
+    const bladeLengthSlider = document.getElementById('bladeLength');
+    const bladeLengthValue = document.getElementById('bladeLengthValue');
     
     // Event listeners for sliders
     windSpeedSlider.addEventListener('input', function() {
@@ -438,6 +447,13 @@
         bladesCountValue.textContent = bladesCount;
         updateBlades();
         calculatePowerOutput(); // Ensure stats update with blade count change
+    });
+
+    bladeLengthSlider.addEventListener('input', function() {
+        bladeLength = parseInt(this.value);
+        bladeLengthValue.textContent = bladeLength + ' m';
+        updateBlades();
+        calculatePowerOutput();
     });
     
     // Handle window resize
