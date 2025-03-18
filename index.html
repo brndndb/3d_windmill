@@ -55,10 +55,23 @@
             clear: both;
             overflow: hidden;
         }
+        #loadingText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body>
     <div id="info">Interactive 3D Windmill - Drag to rotate, scroll to zoom</div>
+    <div id="loadingText">Loading 3D Model...</div>
     
     <div id="stats">
         <h3 style="margin-top: 0; margin-bottom: 10px;">Energy Production</h3>
@@ -100,18 +113,19 @@
             <span id="cameraHeightValue">30</span>
         </div>
         <div class="slider-container">
-            <label for="bladesCount">Blades Count:</label>
-            <input type="range" id="bladesCount" min="2" max="5" value="3" step="1">
-            <span id="bladesCountValue">3</span>
+            <label for="rotationSpeed">Rotation Speed:</label>
+            <input type="range" id="rotationSpeed" min="0" max="2" value="1" step="0.1">
+            <span id="rotationSpeedValue">1x</span>
         </div>
         <div class="slider-container">
-            <label for="bladeLength">Blade Length:</label>
-            <input type="range" id="bladeLength" min="10" max="40" value="25" step="1">
-            <span id="bladeLengthValue">25 m</span>
+            <label for="modelScale">Model Scale:</label>
+            <input type="range" id="modelScale" min="0.1" max="5" value="1" step="0.1">
+            <span id="modelScaleValue">1x</span>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
     // Initialize Three.js components
     const scene = new THREE.Scene();
@@ -248,109 +262,89 @@
     const windmill = new THREE.Group();
     scene.add(windmill);
     
-    // Create tower
-    const towerHeight = 40;
-    const towerGeometry = new THREE.CylinderGeometry(2, 3, towerHeight, 16);
-    const towerMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0xf0f0f0,
-        roughness: 0.6,
-        metalness: 0.2
-    });
-    const tower = new THREE.Mesh(towerGeometry, towerMaterial);
-    tower.position.y = towerHeight / 2;
-    tower.castShadow = true;
-    tower.receiveShadow = true;
-    windmill.add(tower);
-    
-    // Create nacelle
-    const nacelleGeometry = new THREE.BoxGeometry(10, 5, 7);
-    const nacelleMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0xd3d3d3,
-        roughness: 0.5,
-        metalness: 0.4
-    });
-    const nacelle = new THREE.Mesh(nacelleGeometry, nacelleMaterial);
-    nacelle.position.y = towerHeight + 2.5;
-    nacelle.position.z = 2;
-    nacelle.castShadow = true;
-    nacelle.receiveShadow = true;
-    windmill.add(nacelle);
-    
-    // Create hub
-    const hubGeometry = new THREE.CylinderGeometry(1.5, 1.5, 2, 16);
-    const hubMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x505050,
-        roughness: 0.3,
-        metalness: 0.7
-    });
-    const hub = new THREE.Mesh(hubGeometry, hubMaterial);
-    hub.position.y = towerHeight;
-    hub.position.z = 6;
-    hub.rotation.x = Math.PI / 2;
-    hub.castShadow = true;
-    hub.receiveShadow = true;
-    windmill.add(hub);
-    
-    // Create rotor group for blades
-    const rotorGroup = new THREE.Group();
-    rotorGroup.position.y = towerHeight;
-    rotorGroup.position.z = 6;
-    windmill.add(rotorGroup);
-    
     // Variables for animation and configuration
     let windSpeed = 10; // mph
     let rotationSpeed = 0;
-    let blades = [];
-    let bladesCount = 3;
-    let bladeLength = 25; // Now a variable instead of const
+    let userRotationMultiplier = 1;
+    let bladeLength = 25; // Default blade length for calculations
     let bladeDiameter = bladeLength * 2;
+    let windmillModel = null;
+    let rotorPart = null;
+    let modelScale = 1;
 
     // Update blade diameter stat
     document.getElementById('bladeDiameterStat').textContent = bladeDiameter + ' m';
     
-    // Function to create a single blade
-    function createBlade() {
-        const bladeGeometry = new THREE.BoxGeometry(bladeLength, 1.5, 0.2);
-        const bladeMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xffffff,
-            roughness: 0.5,
-            metalness: 0.2,
-            side: THREE.DoubleSide
-        });
-        const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-        blade.castShadow = true;
-        blade.receiveShadow = true;
-        blade.position.x = bladeLength / 2;
-        return blade;
-    }
-    
-    // Function to update blades
-    function updateBlades() {
-        blades.forEach(blade => rotorGroup.remove(blade));
-        blades = [];
-        for (let i = 0; i < bladesCount; i++) {
-            const blade = createBlade();
-            const angle = (i / bladesCount) * Math.PI * 2;
-            const bladeGroup = new THREE.Group();
-            bladeGroup.rotation.z = angle;
-            bladeGroup.add(blade);
-            rotorGroup.add(bladeGroup);
-            blades.push(bladeGroup);
-        }
+    // GLTF Loader to load the 3D model
+    const loader = new THREE.GLTFLoader();
+    const modelUrl = 'Wind turbine.glb'; // Replace with your model URL
+
+    // Function to load the 3D model
+    function loadModel() {
+        loader.load(
+            // The model URL - replace this with your actual model URL
+            'Wind turbine.glb',
+            
+            // onLoad callback - called when the model is loaded
+            function(gltf) {
+                windmillModel = gltf.scene;
+                
+                // Add the model to the scene
+                windmill.add(windmillModel);
+                
+                // Set the scale of the model
+                windmillModel.scale.set(modelScale, modelScale, modelScale);
+                
+                // Cast shadows
+                windmillModel.traverse(function(node) {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+                
+                // Find the rotor part by name (you'll need to know the name from your model)
+                // This is a placeholder, your model's structure might be different
+                rotorPart = windmillModel.getObjectByName('WindmillRotor');
+                
+                // If rotorPart is found, we can animate it
+                if (!rotorPart) {
+                    console.warn('Rotor part not found in the model. You may need to identify its name in the model.');
+                    // You might need to find the exact path to the rotor in your model
+                    // For example, it might be nested deeper in the hierarchy
+                }
+                
+                // Hide loading text
+                document.getElementById('loadingText').style.display = 'none';
+                
+                // Calculate power output based on initial values
+                calculatePowerOutput();
+            },
+            
+            // onProgress callback - can be used to show loading progress
+            function(xhr) {
+                const loadingPercentage = Math.floor((xhr.loaded / xhr.total) * 100);
+                document.getElementById('loadingText').textContent = 
+                    'Loading 3D Model: ' + loadingPercentage + '%';
+            },
+            
+            // onError callback - called when loading has errors
+            function(error) {
+                console.error('An error happened while loading the model:', error);
+                document.getElementById('loadingText').textContent = 
+                    'Error loading model. Please check console for details.';
+            }
+        );
     }
     
     // Function to calculate power output
     function calculatePowerOutput() {
         const windSpeedMS = windSpeed * 0.44704; // Convert mph to m/s
         const airDensity = 1.225; // kg/m^3
-        bladeDiameter = bladeLength * 2; // Update diameter based on current blade length
         const sweptArea = Math.PI * Math.pow(bladeDiameter / 2, 2); // Swept area in m^2
         const ratedWindSpeedMS = 12; // Rated wind speed in m/s
         const cutInWindSpeedMS = 3; // Cut-in wind speed in m/s
         const cutOutWindSpeedMS = 25; // Cut-out wind speed in m/s
-
-        // Blade count efficiency
-        const bladeCountEfficiency = bladesCount === 3 ? 1 : (bladesCount === 2 ? 0.95 : 0.8);
 
         // Base efficiency (constant between cut-in and rated speed)
         const baseEfficiency = 0.45; // Based on typical turbine efficiency
@@ -364,11 +358,11 @@
             totalEfficiency = 0;
         } else if (windSpeedMS >= cutInWindSpeedMS && windSpeedMS < ratedWindSpeedMS) {
             const theoreticalPower = 0.5 * airDensity * sweptArea * Math.pow(windSpeedMS, 3);
-            totalEfficiency = baseEfficiency * bladeCountEfficiency;
+            totalEfficiency = baseEfficiency;
             powerOutput = theoreticalPower * totalEfficiency / 1000; // Convert to kW
         } else {
             const ratedPower = 0.5 * airDensity * sweptArea * Math.pow(ratedWindSpeedMS, 3);
-            totalEfficiency = baseEfficiency * bladeCountEfficiency;
+            totalEfficiency = baseEfficiency;
             powerOutput = ratedPower * totalEfficiency / 1000; // Convert to kW
         }
 
@@ -391,13 +385,9 @@
         if (windSpeedMS < cutInWindSpeedMS || windSpeedMS >= cutOutWindSpeedMS) {
             rotationSpeed = 0;
         } else {
-            rotationSpeed = (tipSpeedRatio * windSpeedMS) / bladeRadius;
+            rotationSpeed = ((tipSpeedRatio * windSpeedMS) / bladeRadius) * userRotationMultiplier;
         }
     }
-    
-    // Initial blade creation and power calculation
-    updateBlades();
-    calculatePowerOutput();
     
     // Create wind particles
     const particlesCount = 100;
@@ -423,10 +413,10 @@
     const windSpeedValue = document.getElementById('windSpeedValue');
     const cameraHeightSlider = document.getElementById('cameraHeight');
     const cameraHeightValue = document.getElementById('cameraHeightValue');
-    const bladesCountSlider = document.getElementById('bladesCount');
-    const bladesCountValue = document.getElementById('bladesCountValue');
-    const bladeLengthSlider = document.getElementById('bladeLength');
-    const bladeLengthValue = document.getElementById('bladeLengthValue');
+    const rotationSpeedSlider = document.getElementById('rotationSpeed');
+    const rotationSpeedValue = document.getElementById('rotationSpeedValue');
+    const modelScaleSlider = document.getElementById('modelScale');
+    const modelScaleValue = document.getElementById('modelScaleValue');
     
     // Event listeners for sliders
     windSpeedSlider.addEventListener('input', function() {
@@ -442,18 +432,18 @@
         controls.update();
     });
     
-    bladesCountSlider.addEventListener('input', function() {
-        bladesCount = parseInt(this.value);
-        bladesCountValue.textContent = bladesCount;
-        updateBlades();
-        calculatePowerOutput(); // Ensure stats update with blade count change
-    });
-
-    bladeLengthSlider.addEventListener('input', function() {
-        bladeLength = parseInt(this.value);
-        bladeLengthValue.textContent = bladeLength + ' m';
-        updateBlades();
+    rotationSpeedSlider.addEventListener('input', function() {
+        userRotationMultiplier = parseFloat(this.value);
+        rotationSpeedValue.textContent = userRotationMultiplier.toFixed(1) + 'x';
         calculatePowerOutput();
+    });
+    
+    modelScaleSlider.addEventListener('input', function() {
+        modelScale = parseFloat(this.value);
+        modelScaleValue.textContent = modelScale.toFixed(1) + 'x';
+        if (windmillModel) {
+            windmillModel.scale.set(modelScale, modelScale, modelScale);
+        }
     });
     
     // Handle window resize
@@ -463,6 +453,9 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
     
+    // Load the model
+    loadModel();
+    
     // Animation loop with frame-rate independence
     let lastTime = performance.now();
     function animate() {
@@ -470,10 +463,12 @@
         const currentTime = performance.now();
         const deltaTime = (currentTime - lastTime) / 1000; // Time in seconds
         
-        // Apply rotation adjusted for frame time
-        rotorGroup.rotation.z += rotationSpeed * deltaTime;
+        // Rotate the rotor part if it exists
+        if (rotorPart) {
+            rotorPart.rotation.z += rotationSpeed * deltaTime;
+        }
 
-        // Update particles (also adjusted for frame time)
+        // Update particles (adjusted for frame time)
         const positions = particlesGeometry.attributes.position.array;
         for (let i = 0; i < positions.length; i += 3) {
             positions[i + 2] -= windSpeed * 0.01 * deltaTime * 60; // Adjust speed for consistency
