@@ -277,13 +277,12 @@
     
     // GLTF Loader to load the 3D model
     const loader = new THREE.GLTFLoader();
-    const modelUrl = 'Wind turbine.glb'; // Replace with your model URL
 
     // Function to load the 3D model
     function loadModel() {
         loader.load(
-            // The model URL - replace this with your actual model URL
-            'Wind turbine.glb',
+            // The specific wind turbine model
+            'wind turbine.glb',
             
             // onLoad callback - called when the model is loaded
             function(gltf) {
